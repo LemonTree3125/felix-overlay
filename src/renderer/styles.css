@@ -86,10 +86,45 @@ body {
   -webkit-backdrop-filter: blur(20px);
   color: var(--overlay-text);
   padding: 14px;
-  transition: box-shadow 0.3s ease;
+  max-height: 150px;
+  transition: box-shadow 0.3s ease, max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   transform-style: preserve-3d;
   will-change: transform;
   position: relative;
+  overflow: hidden;
+}
+
+.widget-expanded {
+  max-height: 500px;
+}
+
+/* AI Agent widget: expand to max height immediately on first message.
+   Using fixed height prevents "growing per message" as content increases. */
+.widgetChat {
+  height: auto;
+  max-height: 150px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.3s ease, height 0.4s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-bottom: 15px;
+}
+
+.widgetChat.widget-expanded {
+  height: 500px;
+  max-height: 500px;
+  padding-top: 18px;
+  padding-bottom: 0px;
+}
+
+.widgetChat .widgetBody {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.widgetChat.widget-expanded .chatbox {
+  max-height: none;
+  height: 100%;
 }
 
 .widget::before {
@@ -128,6 +163,8 @@ body {
 .widgetBody {
   font-size: 12px;
   color: var(--overlay-text-muted);
+  display: flex;
+  flex-direction: column;
 }
 
 .liveClockTime {
@@ -211,12 +248,15 @@ body {
 .chatbox {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  transition: height 0.3s ease;
+  gap: 0;
+  max-height: 50px;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), gap 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .chatbox-expanded {
-  height: 400px;
+  max-height: 400px;
+  gap: 8px;
 }
 
 .chatMessages {
@@ -228,6 +268,15 @@ body {
   padding: 2px;
   user-select: text;
   min-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s, padding 0.3s ease;
+}
+
+.chatbox-expanded .chatMessages {
+  opacity: 1;
+  transform: translateY(0);
+  /* padding-top: 12px; */
 }
 
 .chatMessages::-webkit-scrollbar {

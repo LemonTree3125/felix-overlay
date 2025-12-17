@@ -4,9 +4,11 @@ type WidgetProps = {
   title: string
   className?: string
   children?: React.ReactNode
+  disableTilt?: boolean
+  expanded?: boolean
 }
 
-function Widget({ title, className, children }: WidgetProps) {
+function Widget({ title, className, children, disableTilt = false, expanded = false }: WidgetProps) {
   const hasTitle = title.trim().length > 0
   const widgetRef = React.useRef<HTMLDivElement>(null)
   const [tilt, setTilt] = React.useState({ rotateX: 0, rotateY: 0 })
@@ -42,7 +44,7 @@ function Widget({ title, className, children }: WidgetProps) {
       window.overlay?.setWidgetHovering(true)
     }
 
-    if (!widgetRef.current) return
+    if (!widgetRef.current || disableTilt) return
 
     const rect = widgetRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left
@@ -66,9 +68,9 @@ function Widget({ title, className, children }: WidgetProps) {
   return (
     <div
       ref={widgetRef}
-      className={['widget', className].filter(Boolean).join(' ')}
+      className={['widget', className, expanded ? 'widget-expanded' : ''].filter(Boolean).join(' ')}
       style={{
-        transform: `perspective(1000px) rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) translateY(${tilt.rotateX !== 0 || tilt.rotateY !== 0 ? -4 : 0}px)`,
+        transform: disableTilt ? 'none' : `perspective(1000px) rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) translateY(${tilt.rotateX !== 0 || tilt.rotateY !== 0 ? -4 : 0}px)`,
       }}
       // Critical: hover over a widget => tell main to allow mouse events.
       onMouseEnter={() => {
@@ -143,11 +145,47 @@ type Message = {
   content: string
 }
 
-function Chatbox() {
+type ChatboxProps = {
+  onMessagesChange?: (hasMessages: boolean) => void
+}
+
+function Chatbox({ onMessagesChange }: ChatboxProps) {
   const [input, setInput] = React.useState('')
+  const [messages, setMessages] = React.useState<Message[]>([])
+  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+
+  const hasMessages = messages.length > 0
+
+  React.useEffect(() => {
+    onMessagesChange?.(hasMessages)
+  }, [hasMessages, onMessagesChange])
 
   const handleSend = () => {
-    // Placeholder - no actual functionality yet
+    if (input.trim()) {
+      const isFirstMessage = messages.length === 0
+      const newMessage: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: input.trim()
+      }
+
+      // Expand the parent container immediately on the first user message
+      // so the widget can slide to max height in the same render.
+      if (isFirstMessage) onMessagesChange?.(true)
+
+      setMessages((prev) => [...prev, newMessage])
+      setInput('')
+
+      // Simulate assistant response after a short delay
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: 'This is a placeholder response from the AI agent.'
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      }, 500)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -157,8 +195,22 @@ function Chatbox() {
     }
   }
 
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
   return (
-    <div className="chatbox">
+    <div className={`chatbox ${hasMessages ? 'chatbox-expanded' : ''}`}>
+      {hasMessages && (
+        <div className="chatMessages">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`chatMessage chatMessage-${msg.role}`}>
+              <div className="chatMessageContent">{msg.content}</div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
       <div className="chatInputArea">
         <input
           type="text"
@@ -182,6 +234,7 @@ function Chatbox() {
 export default function App() {
   const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [wallpaperPath, setWallpaperPath] = React.useState<string | null>(null)
+  const [chatHasMessages, setChatHasMessages] = React.useState(false)
 
   React.useEffect(() => {
     // Start click-through (main also does this, but keeping the renderer explicit helps during reloads)
@@ -228,8 +281,8 @@ export default function App() {
         <Widget title="" className="widgetLive">
           <LiveClock />
         </Widget>
-        <Widget title="AI Agent">
-          <Chatbox />
+        <Widget title="AI Agent" className="widgetChat" disableTilt={chatHasMessages} expanded={chatHasMessages}>
+          <Chatbox onMessagesChange={setChatHasMessages} />
         </Widget>
         <Widget title="Custom Widgets (Small Informational Text)">Small informational text widgets placeholder.</Widget>
       </div>
