@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, Tray, nativeImage } from 'electron'
+import { exec } from 'node:child_process'
+import { promisify } from 'node:util'
 import fs from 'node:fs'
 import { join, resolve } from 'node:path'
+
+const execAsync = promisify(exec)
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -40,10 +44,19 @@ function setOverlayClickThrough(win: BrowserWindow, clickThrough: boolean) {
   // Critical behavior:
   // - clickThrough=true  => ignore clicks; forward mouse move so renderer can still detect hover.
   // - clickThrough=false => allow normal mouse interaction for widgets.
-  if (clickThrough) {
-    win.setIgnoreMouseEvents(true, { forward: true })
-  } else {
+  
+  // macOS bug: setIgnoreMouseEvents with forward:true doesn't forward mousemove to renderer
+  // Solution: On macOS, always disable ignore when we need mouse tracking (even for click-through)
+  if (process.platform === 'darwin') {
+    // On macOS, we can't use forward:true reliably, so we make the window interactive
+    // The renderer will handle making non-widget areas feel click-through via CSS pointer-events
     win.setIgnoreMouseEvents(false)
+  } else {
+    if (clickThrough) {
+      win.setIgnoreMouseEvents(true, { forward: true })
+    } else {
+      win.setIgnoreMouseEvents(false)
+    }
   }
 }
 
@@ -71,7 +84,10 @@ function createMainWindow(): BrowserWindow {
     show: false,
 
     // "desktop" is best-effort; on Windows true wallpaper pinning requires native handle tricks.
-    type: 'desktop',
+    ...(process.platform === 'win32' ? { type: 'desktop' as const } : {}),
+    
+    // On macOS, acceptFirstMouse allows the window to receive mouse events without becoming active
+    ...(process.platform === 'darwin' ? { acceptFirstMouse: true } : {}),
 
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -92,6 +108,13 @@ function createMainWindow(): BrowserWindow {
 
   // Helpful for overlays.
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  
+  // On macOS, prevent the window from activating/focusing but keep it responsive
+  if (process.platform === 'darwin') {
+    win.setAlwaysOnTop(true, 'floating', 1)
+    // Enable mouse tracking without capturing focus
+    win.setVisibleOnAllWorkspaces(true)
+  }
 
   // NOTE: Electron cannot reliably force "bottom-most" on Windows via JS alone.
   // This is best-effort; see README for WorkerW approach.
@@ -103,10 +126,20 @@ function createMainWindow(): BrowserWindow {
   const devUrl = process.env.ELECTRON_RENDERER_URL
   if (devUrl) {
     win.loadURL(devUrl)
-    win.webContents.openDevTools({ mode: 'detach' })
+    // Only open DevTools if explicitly requested via environment variable
+    if (process.env.OPEN_DEVTOOLS === 'true') {
+      win.webContents.openDevTools({ mode: 'detach' })
+    }
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Suppress Autofill-related console errors from DevTools
+  win.webContents.on('console-message', (event, level, message) => {
+    if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) {
+      event.preventDefault()
+    }
+  })
 
   return win
 }
@@ -159,6 +192,59 @@ app.whenReady().then(() => {
   ipcMain.on('overlay:request-click-through', (_event, clickThrough: boolean) => {
     if (!mainWindow || mainWindow.isDestroyed()) return
     setOverlayClickThrough(mainWindow, clickThrough)
+  })
+
+  ipcMain.on('overlay:focus-window', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    // Allow interaction + ensure keystrokes reach the renderer (e.g., text inputs).
+    setOverlayClickThrough(mainWindow, false)
+    mainWindow.show()
+    
+    // On macOS, we need to temporarily allow the window to become active to receive keyboard input
+    if (process.platform === 'darwin') {
+      mainWindow.setAlwaysOnTop(true, 'pop-up-menu')
+    }
+    
+    mainWindow.focus()
+  })
+
+  ipcMain.on('overlay:blur-window', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    // Restore overlay floating behavior on macOS when input loses focus
+    if (process.platform === 'darwin') {
+      mainWindow.setAlwaysOnTop(true, 'floating', 1)
+    }
+  })
+
+  ipcMain.handle('overlay:get-wallpaper-path', async () => {
+    try {
+      if (process.platform === 'darwin') {
+        // macOS: Use osascript to get wallpaper path for each desktop
+        // Try getting from System Events which is more reliable
+        const { stdout } = await execAsync(
+          'osascript -e \'tell application "System Events" to tell current desktop to get picture\''
+        )
+        const path = stdout.trim()
+        // Check if it's a valid path and not empty
+        if (path && path !== 'missing value' && !path.includes('error')) {
+          return path
+        }
+        return null
+      } else if (process.platform === 'win32') {
+        // Windows: Get wallpaper from registry
+        const { stdout } = await execAsync(
+          'reg query "HKEY_CURRENT_USER\\Control Panel\\Desktop" /v Wallpaper'
+        )
+        const match = stdout.match(/Wallpaper\s+REG_SZ\s+(.+)/)
+        return match ? match[1].trim() : null
+      } else {
+        // Linux: Try common paths
+        return null
+      }
+    } catch (error) {
+      console.error('Failed to get wallpaper path:', error)
+      return null
+    }
   })
 
   app.on('activate', () => {

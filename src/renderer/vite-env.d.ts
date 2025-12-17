@@ -5,6 +5,7 @@ declare global {
     overlay: {
       setWidgetHovering: (hovering: boolean) => void
       requestClickThrough: (clickThrough: boolean) => void
+      focusWindow: () => void
       onOpenSettings: (handler: () => void) => () => void
     }
   }

@@ -12,6 +12,7 @@ function Widget({ title, className, children }: WidgetProps) {
   const [tilt, setTilt] = React.useState({ rotateX: 0, rotateY: 0 })
   const targetTilt = React.useRef({ rotateX: 0, rotateY: 0 })
   const animationFrame = React.useRef<number>()
+  const hoveringRef = React.useRef(false)
 
   React.useEffect(() => {
     const animate = () => {
@@ -34,6 +35,13 @@ function Widget({ title, className, children }: WidgetProps) {
   }, [])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // In click-through mode, Electron can forward mousemove but not mouseenter.
+    // Use first mousemove as a reliable signal to disable click-through.
+    if (!hoveringRef.current) {
+      hoveringRef.current = true
+      window.overlay?.setWidgetHovering(true)
+    }
+
     if (!widgetRef.current) return
 
     const rect = widgetRef.current.getBoundingClientRect()
@@ -51,6 +59,7 @@ function Widget({ title, className, children }: WidgetProps) {
 
   const handleMouseLeave = () => {
     targetTilt.current = { rotateX: 0, rotateY: 0 }
+    hoveringRef.current = false
     window.overlay?.setWidgetHovering(false)
   }
 
@@ -62,7 +71,10 @@ function Widget({ title, className, children }: WidgetProps) {
         transform: `perspective(1000px) rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) translateY(${tilt.rotateX !== 0 || tilt.rotateY !== 0 ? -4 : 0}px)`,
       }}
       // Critical: hover over a widget => tell main to allow mouse events.
-      onMouseEnter={() => window.overlay?.setWidgetHovering(true)}
+      onMouseEnter={() => {
+        hoveringRef.current = true
+        window.overlay?.setWidgetHovering(true)
+      }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
@@ -155,6 +167,9 @@ function Chatbox() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => window.overlay?.focusWindow()}
+          onBlur={() => window.overlay?.blurWindow()}
+          onMouseDown={() => window.overlay?.focusWindow()}
         />
         <button className="chatSendButton" onClick={handleSend}>
           Send
@@ -166,10 +181,18 @@ function Chatbox() {
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const [wallpaperPath, setWallpaperPath] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     // Start click-through (main also does this, but keeping the renderer explicit helps during reloads)
     window.overlay?.requestClickThrough(true)
+
+    // Fetch wallpaper path
+    window.overlay?.getWallpaperPath().then((path) => {
+      if (path) {
+        setWallpaperPath(path)
+      }
+    })
 
     const unsubscribe = window.overlay?.onOpenSettings(() => {
       setSettingsOpen(true)
@@ -181,17 +204,27 @@ export default function App() {
   }, [])
 
   return (
-    <div
-      className="overlayRoot"
-      // When hovering empty space, explicitly return to click-through.
-      // This is a safety-net in case pointer leaves a widget without firing leave.
-      onMouseMove={(e) => {
-        const target = e.target as HTMLElement | null
-        const insideWidget = !!target?.closest?.('.widget, .settingsPanel')
-        if (!insideWidget) window.overlay?.setWidgetHovering(false)
-      }}
-    >
-      <div className="widgetStack" aria-label="Overlay widgets">
+    <>
+      {wallpaperPath && (
+        <div 
+          className="wallpaperBackground"
+          style={{
+            backgroundImage: `url(file://${wallpaperPath})`,
+          }}
+        />
+      )}
+      <div
+        className="overlayRoot"
+        // When hovering empty space, explicitly return to click-through.
+        // This is a safety-net in case pointer leaves a widget without firing leave.
+        onMouseMove={(e) => {
+          const target = e.target as HTMLElement | null
+          const insideWidget = !!target?.closest?.('.widget, .settingsPanel')
+          if (!insideWidget) window.overlay?.setWidgetHovering(false)
+        }}
+      >
+        <div className="wallpaperBlur" />
+        <div className="widgetStack" aria-label="Overlay widgets">
         <Widget title="" className="widgetLive">
           <LiveClock />
         </Widget>
@@ -222,6 +255,7 @@ export default function App() {
           <div className="widgetBody">Placeholder settings panel opened from tray.</div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }

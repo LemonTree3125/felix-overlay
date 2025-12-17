@@ -25,6 +25,20 @@ body {
 #root {
   width: 100vw;
   height: 100vh;
+  position: relative;
+}
+
+.wallpaperBackground {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -2;
+  pointer-events: none;
 }
 
 .overlayRoot {
@@ -34,6 +48,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* On macOS, make background click-through at CSS level since Electron's
+     setIgnoreMouseEvents(true, {forward:true}) doesn't forward mousemove events */
+  pointer-events: none;
+}
+
+.wallpaperBlur {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(80px) brightness(0.9);
+  -webkit-backdrop-filter: blur(80px) brightness(0.9);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .widgetStack {
@@ -41,6 +70,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Re-enable pointer events for widgets */
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .widget {
@@ -67,10 +100,6 @@ body {
   right: -12px;
   bottom: -12px;
   pointer-events: none;
-}
-
-.widget:hover::before {
-  pointer-events: auto;
 }
 
 .widget:hover {
@@ -152,6 +181,9 @@ body {
   -webkit-backdrop-filter: blur(20px);
   color: var(--overlay-text);
   padding: 14px;
+  /* Re-enable pointer events for settings panel */
+  pointer-events: auto;
+  z-index: 2;
 }
 
 .settingsHeader {
@@ -267,6 +299,7 @@ body {
   font-family: inherit;
   pointer-events: auto;
   cursor: text;
+  user-select: text;
 }
 
 .chatInput::placeholder {
