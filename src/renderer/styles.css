@@ -4,9 +4,15 @@ body {
   height: 100%;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
-  --overlay-text: rgba(17, 17, 17, 0.86);
-  --overlay-text-muted: rgba(17, 17, 17, 0.72);
+  --overlay-text: rgba(17, 17, 17, 0.96);
+  --overlay-text-muted: rgba(17, 17, 17, 0.84);
   --overlay-surface: rgba(238, 238, 238, 0.28);
   --overlay-surface-strong: rgba(238, 238, 238, 0.34);
   --overlay-border: rgba(0, 0, 0, 0.07);
@@ -26,7 +32,7 @@ body {
   width: 100vw;
   height: 100vh;
   position: relative;
-}
+} 
 
 .wallpaperBackground {
   position: fixed;
@@ -76,6 +82,81 @@ body {
   z-index: 1;
 }
 
+.widgetRow {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+
+.widgetRow > .widget,
+.widgetRow > .widgetHitbox {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.widgetHitbox {
+  width: 100%;
+  position: relative;
+}
+
+.widgetHitbox > .widget {
+  width: 100%;
+}
+
+.widgetSmall {
+  min-height: 60px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.widgetSmall .widgetBody {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.widgetSmall .widgetTitle {
+  margin: 0;
+}
+
+.tempWidgetValue {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--overlay-text);
+}
+
+.weatherWidgetValue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.weatherStateIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.batteryWidgetValue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.batteryStateIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
 .widget {
   width: 100%;
   container-type: inline-size;
@@ -86,45 +167,10 @@ body {
   -webkit-backdrop-filter: blur(20px);
   color: var(--overlay-text);
   padding: 14px;
-  max-height: 150px;
-  transition: box-shadow 0.3s ease, max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.3s ease;
   transform-style: preserve-3d;
   will-change: transform;
   position: relative;
-  overflow: hidden;
-}
-
-.widget-expanded {
-  max-height: 500px;
-}
-
-/* AI Agent widget: expand to max height immediately on first message.
-   Using fixed height prevents "growing per message" as content increases. */
-.widgetChat {
-  height: auto;
-  max-height: 150px;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.3s ease, height 0.4s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  padding-bottom: 15px;
-}
-
-.widgetChat.widget-expanded {
-  height: 500px;
-  max-height: 500px;
-  padding-top: 18px;
-  padding-bottom: 0px;
-}
-
-.widgetChat .widgetBody {
-  flex: 1;
-  min-height: 0;
-  padding: 0;
-}
-
-.widgetChat.widget-expanded .chatbox {
-  max-height: none;
-  height: 100%;
 }
 
 .widget::before {
@@ -138,6 +184,10 @@ body {
 }
 
 .widget:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.widgetHitbox:hover > .widget {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
@@ -156,7 +206,6 @@ body {
 
 .widgetTitle {
   font-size: 14px;
-  opacity: 0.9;
   margin: 0 0 10px 0;
 }
 
@@ -172,7 +221,6 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  opacity: 0.92;
 }
 
 .liveClockMain {
@@ -191,19 +239,16 @@ body {
 .liveClockSeconds {
   font-size: 8cqi;
   line-height: 1;
-  opacity: 0.9;
 }
 
 .liveClockAmPm {
   font-size: 7cqi;
   line-height: 1;
-  opacity: 0.8;
 }
 
 .liveClockDate {
   font-size: 4cqi;
-  line-height: 1;
-  opacity: 0.75;
+  line-height: 1; 
 }
 
 .settingsPanel {
@@ -243,140 +288,4 @@ body {
   border-radius: 10px;
   padding: 6px 10px;
   cursor: pointer;
-}
-
-.chatbox {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-height: 50px;
-  overflow: hidden;
-  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), gap 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.chatbox-expanded {
-  max-height: 400px;
-  gap: 8px;
-}
-
-.chatMessages {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 2px;
-  user-select: text;
-  min-height: 0;
-  opacity: 0;
-  transform: translateY(-10px);
-  transition: opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s, padding 0.3s ease;
-}
-
-.chatbox-expanded .chatMessages {
-  opacity: 1;
-  transform: translateY(0);
-  /* padding-top: 12px; */
-}
-
-.chatMessages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chatMessages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chatMessages::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-
-.chatMessages::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.chatMessage {
-  display: flex;
-  width: 100%;
-}
-
-.chatMessage-user {
-  justify-content: flex-end;
-}
-
-.chatMessage-assistant {
-  justify-content: flex-start;
-}
-
-.chatMessageContent {
-  max-width: 80%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  word-wrap: break-word;
-}
-
-.chatMessage-user .chatMessageContent {
-  background: var(--overlay-button-bg);
-  border: 1px solid var(--overlay-button-border);
-  color: var(--overlay-text);
-}
-
-.chatMessage-assistant .chatMessageContent {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  color: var(--overlay-text);
-}
-
-.chatInputArea {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.chatInput {
-  flex: 1;
-  border: 1px solid var(--overlay-button-border);
-  background: var(--overlay-button-bg);
-  color: var(--overlay-text);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 13px;
-  outline: none;
-  font-family: inherit;
-  pointer-events: auto;
-  cursor: text;
-  user-select: text;
-}
-
-.chatInput::placeholder {
-  color: var(--overlay-text-muted);
-  opacity: 0.7;
-}
-
-.chatInput:focus {
-  border-color: rgba(0, 0, 0, 0.2);
-}
-
-.chatSendButton {
-  border: 1px solid var(--overlay-button-border);
-  background: var(--overlay-button-bg);
-  color: var(--overlay-text);
-  border-radius: 10px;
-  padding: 8px 16px;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.2s ease;
-  pointer-events: auto;
-}
-
-.chatSendButton:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.chatSendButton:active {
-  transform: translateY(1px);
 }

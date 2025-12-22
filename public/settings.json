@@ -1,0 +1,13 @@
+{
+  "forceFallback": false,
+  "theme": {
+    "backgroundColor": "#eeeeee",
+    "backgroundOpacity": 0.28,
+    "textColor": "#111111",
+    "textOpacity": 0.96
+  },
+  "widgets": {
+    "big": "clock",
+    "small": ["weather", "empty", "battery"]
+  }
+}
