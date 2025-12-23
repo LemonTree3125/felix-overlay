@@ -1,6 +1,9 @@
 import React from 'react'
 import {
   Battery as BatteryIcon,
+  Cpu,
+  Monitor,
+  MemoryStick,
   Cloud,
   CloudDrizzle,
   CloudFog,
@@ -388,6 +391,57 @@ function useBatteryInfo() {
   return state
 }
 
+type SystemUsage = {
+  cpuPercent: number | null
+  memoryPercent: number | null
+  gpuPercent: number | null
+  updatedAt: number
+}
+
+function useSystemUsage() {
+  const [state, setState] = React.useState<
+    | { status: 'loading' }
+    | { status: 'ready'; usage: SystemUsage }
+    | { status: 'error' }
+  >({ status: 'loading' })
+
+  React.useEffect(() => {
+    let cancelled = false
+    let timeoutId: number | undefined
+
+    const refresh = async () => {
+      try {
+        const usage = await window.overlay?.getSystemUsage?.()
+        if (cancelled) return
+        if (!usage) {
+          setState({ status: 'error' })
+          return
+        }
+        setState({ status: 'ready', usage })
+      } catch {
+        if (cancelled) return
+        setState({ status: 'error' })
+      } finally {
+        if (cancelled) return
+        timeoutId = window.setTimeout(refresh, 1_000)
+      }
+    }
+
+    refresh()
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+    }
+  }, [])
+
+  return state
+}
+
+function formatPercent(value: number | null): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--'
+  return String(Math.round(Math.max(0, Math.min(100, value))))
+}
+
 type WidgetProps = {
   title: string
   className?: string
@@ -593,6 +647,7 @@ export default function App() {
   const [overlaySettings, setOverlaySettings] = React.useState<OverlaySettings>(DEFAULT_OVERLAY_SETTINGS)
   const tempState = useCurrentTemperatureC()
   const batteryState = useBatteryInfo()
+  const usageState = useSystemUsage()
   const widgetStackRef = React.useRef<HTMLDivElement>(null)
   const settingsPanelRef = React.useRef<HTMLDivElement>(null)
 
@@ -608,6 +663,35 @@ export default function App() {
       rgbaFromHex(s.theme.backgroundColor, Math.min(1, s.theme.backgroundOpacity + 0.06))
     )
   }, [])
+
+  const setSmallWidgetAtIndex = React.useCallback(
+    (index: number, widget: SmallWidgetType) => {
+      setOverlaySettings((prev) => {
+        const nextSmall: [SmallWidgetType, SmallWidgetType, SmallWidgetType] = [...prev.widgets.small]
+        nextSmall[index] = widget
+        return {
+          ...prev,
+          widgets: {
+            ...prev.widgets,
+            small: nextSmall
+          }
+        }
+      })
+    },
+    []
+  )
+
+  const smallWidgetOptions: Array<{ value: SmallWidgetType; label: string }> = React.useMemo(
+    () => [
+      { value: 'weather', label: 'Weather' },
+      { value: 'battery', label: 'Battery' },
+      { value: 'cpu', label: 'CPU' },
+      { value: 'gpu', label: 'GPU' },
+      { value: 'memory', label: 'Memory' },
+      { value: 'empty', label: 'Empty' }
+    ],
+    []
+  )
 
   const renderSmallWidget = React.useCallback(
     (widgetType: SmallWidgetType, index: number) => {
@@ -634,6 +718,74 @@ export default function App() {
               <BatteryPowerIcon
                 source={batteryState.status === 'ready' ? batteryState.info.powerSource : 'unknown'}
               />
+            </div>
+          </Widget>
+        )
+      }
+
+      if (widgetType === 'cpu') {
+        const cpu = usageState.status === 'ready' ? usageState.usage.cpuPercent : null
+        return (
+          <Widget key={`small-${index}`} title="CPU" className="widgetSmall">
+            <div className="metricWidgetValue tempWidgetValue" aria-label={`CPU ${formatPercent(cpu)} percent`}>
+              <span>{formatPercent(cpu)}%</span>
+              <Cpu className="metricStateIcon" aria-hidden={true} size={14} />
+            </div>
+          </Widget>
+        )
+      }
+
+      if (widgetType === 'gpu') {
+        const gpu = usageState.status === 'ready' ? usageState.usage.gpuPercent : null
+        return (
+          <Widget key={`small-${index}`} title="GPU" className="widgetSmall">
+            <div className="metricWidgetValue tempWidgetValue" aria-label={`GPU ${formatPercent(gpu)} percent`}>
+              <span>{formatPercent(gpu)}%</span>
+              <Monitor className="metricStateIcon" aria-hidden={true} size={14} />
+            </div>
+          </Widget>
+        )
+      }
+
+      if (widgetType === 'memory') {
+        const mem = usageState.status === 'ready' ? usageState.usage.memoryPercent : null
+        return (
+          <Widget key={`small-${index}`} title="Memory" className="widgetSmall">
+            <div className="metricWidgetValue tempWidgetValue" aria-label={`Memory ${formatPercent(mem)} percent`}>
+              <span>{formatPercent(mem)}%</span>
+              <MemoryStick className="metricStateIcon" aria-hidden={true} size={14} />
+            </div>
+          </Widget>
+        )
+      }
+
+      // legacy combined widget (still supported for existing configs)
+      if (widgetType === 'usage') {
+        const cpu = usageState.status === 'ready' ? usageState.usage.cpuPercent : null
+        const gpu = usageState.status === 'ready' ? usageState.usage.gpuPercent : null
+        const mem = usageState.status === 'ready' ? usageState.usage.memoryPercent : null
+
+        return (
+          <Widget key={`small-${index}`} title="Usage" className="widgetSmall">
+            <div
+              className="usageWidget"
+              aria-label={`CPU ${formatPercent(cpu)} percent, GPU ${formatPercent(gpu)} percent, Memory ${formatPercent(mem)} percent`}
+            >
+              <div className="usageItem">
+                <Cpu className="usageIcon" aria-hidden={true} size={14} />
+                <span className="usageLabel">CPU</span>
+                <span className="usageValue">{formatPercent(cpu)}%</span>
+              </div>
+              <div className="usageItem">
+                <span className="usageDot" aria-hidden={true} />
+                <span className="usageLabel">GPU</span>
+                <span className="usageValue">{formatPercent(gpu)}%</span>
+              </div>
+              <div className="usageItem">
+                <MemoryStick className="usageIcon" aria-hidden={true} size={14} />
+                <span className="usageLabel">Mem</span>
+                <span className="usageValue">{formatPercent(mem)}%</span>
+              </div>
             </div>
           </Widget>
         )
@@ -668,7 +820,7 @@ export default function App() {
         </Widget>
       )
     },
-    [batteryState, tempState]
+    [batteryState, tempState, usageState]
   )
 
   React.useEffect(() => {
@@ -855,7 +1007,30 @@ export default function App() {
               Close
             </button>
           </div>
-          <div className="widgetBody">Placeholder settings panel opened from tray.</div>
+          <div className="settingsBody">
+            <div className="settingsSectionTitle">Small widgets</div>
+            <div className="settingsGrid" aria-label="Small widget slots">
+              {[0, 1, 2].map((i) => (
+                <label key={i} className="settingsRow">
+                  <span className="settingsLabel">Slot {i + 1}</span>
+                  <select
+                    className="settingsSelect"
+                    value={overlaySettings.widgets.small[i]}
+                    onChange={(e) => setSmallWidgetAtIndex(i, e.target.value as SmallWidgetType)}
+                  >
+                    {smallWidgetOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <div className="settingsHint">
+              Tip: edit <code>public/settings.json</code> to make these persistent.
+            </div>
+          </div>
         </div>
       )}
       </div>

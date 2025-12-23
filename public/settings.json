@@ -8,6 +8,6 @@
   },
   "widgets": {
     "big": "clock",
-    "small": ["weather", "empty", "battery"]
+    "small": ["weather", "battery", "cpu"]
   }
 }

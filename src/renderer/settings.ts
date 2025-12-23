@@ -1,4 +1,4 @@
-export type SmallWidgetType = 'weather' | 'battery' | 'empty'
+export type SmallWidgetType = 'weather' | 'battery' | 'cpu' | 'gpu' | 'memory' | 'usage' | 'empty'
 export type BigWidgetType = 'clock' | 'empty'
 
 export type OverlaySettings = {
@@ -66,7 +66,15 @@ export function rgbaFromHex(hex: string, alpha: number): string {
 }
 
 function isSmallWidgetType(value: unknown): value is SmallWidgetType {
-  return value === 'weather' || value === 'battery' || value === 'empty'
+  return (
+    value === 'weather' ||
+    value === 'battery' ||
+    value === 'cpu' ||
+    value === 'gpu' ||
+    value === 'memory' ||
+    value === 'usage' ||
+    value === 'empty'
+  )
 }
 
 function isBigWidgetType(value: unknown): value is BigWidgetType {

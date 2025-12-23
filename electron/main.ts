@@ -3,6 +3,8 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import fs from 'node:fs'
 import { join, resolve } from 'node:path'
+import os from 'node:os'
+import si from 'systeminformation'
 
 const execAsync = promisify(exec)
 
@@ -23,12 +25,122 @@ const DEFAULT_SETTINGS_JSON = JSON.stringify(
     },
     widgets: {
       big: 'clock',
-      small: ['weather', 'empty', 'battery']
+      small: ['cpu', 'gpu', 'memory']
     }
   },
   null,
   2
 )
+
+type SystemUsage = {
+  cpuPercent: number | null
+  memoryPercent: number | null
+  gpuPercent: number | null
+  updatedAt: number
+}
+
+let lastCpuTimes: Array<{ idle: number; total: number }> | null = null
+let lastUsageCache: { at: number; value: SystemUsage } | null = null
+
+function normalizeMacBatteryPercentage(stdout: string, percentage: number | null): number | null {
+  if (typeof percentage !== 'number' || !Number.isFinite(percentage)) return null
+  if (percentage < 0 || percentage > 100) return null
+
+  const lower = stdout.toLowerCase()
+  const onAc = lower.includes("now drawing from 'ac power'")
+  if (!onAc) return percentage
+
+  // macOS sometimes displays 100% in the menu bar while pmset reports a slightly
+  // lower percent (e.g. 98%) during "finishing charge" / optimized charging.
+  // Prefer matching the OS UX when we can infer "effectively full".
+  if (lower.includes('charged')) return 100
+  if (lower.includes('finishing charge') && percentage >= 95) return 100
+  if (lower.includes('charging') && percentage >= 99) return 100
+
+  return percentage
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+function readCpuPercentBestEffort(): number | null {
+  try {
+    const cpus = os.cpus()
+    if (!cpus || cpus.length === 0) return null
+
+    const times = cpus.map((c) => {
+      const t = c.times
+      const idle = t.idle
+      const total = t.user + t.nice + t.sys + t.irq + t.idle
+      return { idle, total }
+    })
+
+    // First call: store baseline and return null (no delta yet)
+    if (!lastCpuTimes || lastCpuTimes.length !== times.length) {
+      lastCpuTimes = times
+      return null
+    }
+
+    let idleDelta = 0
+    let totalDelta = 0
+    for (let i = 0; i < times.length; i++) {
+      idleDelta += times[i].idle - lastCpuTimes[i].idle
+      totalDelta += times[i].total - lastCpuTimes[i].total
+    }
+    lastCpuTimes = times
+
+    if (totalDelta <= 0) return null
+    const busy = 1 - idleDelta / totalDelta
+    return clampPercent(busy * 100)
+  } catch {
+    return null
+  }
+}
+
+function readMemoryPercentBestEffort(): number | null {
+  try {
+    const total = os.totalmem()
+    const free = os.freemem()
+    if (!Number.isFinite(total) || total <= 0) return null
+    const used = total - free
+    return clampPercent((used / total) * 100)
+  } catch {
+    return null
+  }
+}
+
+async function readGpuPercentBestEffort(): Promise<number | null> {
+  try {
+    const g = await si.graphics()
+    const controllers = g.controllers || []
+    let best: number | null = null
+    for (const c of controllers) {
+      const raw = (c as any).utilizationGpu
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        const v = clampPercent(raw)
+        best = best === null ? v : Math.max(best, v)
+      }
+    }
+    return best
+  } catch {
+    return null
+  }
+}
+
+async function getSystemUsageBestEffort(): Promise<SystemUsage> {
+  const now = Date.now()
+  // `systeminformation.graphics()` can be a bit heavy; cache briefly.
+  if (lastUsageCache && now - lastUsageCache.at < 750) return lastUsageCache.value
+
+  const cpuPercent = readCpuPercentBestEffort()
+  const memoryPercent = readMemoryPercentBestEffort()
+  const gpuPercent = await readGpuPercentBestEffort()
+  const value: SystemUsage = { cpuPercent, memoryPercent, gpuPercent, updatedAt: now }
+  lastUsageCache = { at: now, value }
+  return value
+}
 
 function isDevMode() {
   return !!process.env.ELECTRON_RENDERER_URL || process.env.NODE_ENV === 'development'
@@ -326,6 +438,15 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('overlay:get-system-usage', async () => {
+    try {
+      return await getSystemUsageBestEffort()
+    } catch (err) {
+      console.warn('[usage] failed to read system usage:', err)
+      return { cpuPercent: null, memoryPercent: null, gpuPercent: null, updatedAt: Date.now() } satisfies SystemUsage
+    }
+  })
+
   // Required by your spec: use electron.screen for display size.
   // Note: screen can only be used after app is ready.
 
@@ -381,9 +502,7 @@ app.whenReady().then(() => {
       const match = stdout.match(/(\d{1,3})%/)
       if (!match) return null
       const value = Number(match[1])
-      if (!Number.isFinite(value)) return null
-      if (value < 0 || value > 100) return null
-      return value
+      return normalizeMacBatteryPercentage(stdout, value)
     } catch (error) {
       console.error('Failed to get battery percentage:', error)
       return null
@@ -398,7 +517,7 @@ app.whenReady().then(() => {
       const { stdout } = await execAsync('pmset -g batt')
       const match = stdout.match(/(\d{1,3})%/)
       const percentageRaw = match ? Number(match[1]) : null
-      const percentage =
+      let percentage =
         typeof percentageRaw === 'number' && Number.isFinite(percentageRaw) && percentageRaw >= 0 && percentageRaw <= 100
           ? percentageRaw
           : null
@@ -426,6 +545,9 @@ app.whenReady().then(() => {
         // Best-effort: when on battery and not explicitly charging, assume discharging.
         state = 'discharging'
       }
+
+      // Normalize percent to better match macOS UI.
+      percentage = normalizeMacBatteryPercentage(stdout, percentage)
 
       return { percentage, state, powerSource }
     } catch (error) {

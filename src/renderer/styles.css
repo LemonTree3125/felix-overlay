@@ -157,6 +157,63 @@ body {
   opacity: 0.9;
 }
 
+.metricWidgetValue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.metricStateIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.usageWidget {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.usageItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.usageIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.usageDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--overlay-text-muted);
+  opacity: 0.9;
+  flex: 0 0 auto;
+}
+
+.usageLabel {
+  color: var(--overlay-text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.usageValue {
+  margin-left: auto;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--overlay-text);
+}
+
 .widget {
   width: 100%;
   container-type: inline-size;
@@ -275,6 +332,23 @@ body {
   gap: 12px;
   margin-bottom: 10px;
 }
+  border: 1px solid var(--overlay-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--overlay-text);
+  padding: 14px;
+  /* Re-enable pointer events for settings panel */
+  pointer-events: auto;
+  z-index: 2;
+
+.settingsClose {
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
 
 .settingsHeader h2 {
   margin: 0;
@@ -282,6 +356,61 @@ body {
 }
 
 .settingsClose {
+  border: 1px solid var(--overlay-button-border);
+  background: var(--overlay-button-bg);
+  color: var(--overlay-text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.settingsBody {
+  padding: 14px;
+}
+
+.settingsSectionTitle {
+  font-size: 12px;
+  color: var(--overlay-text);
+  margin-bottom: 10px;
+}
+
+.settingsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settingsLabel {
+  font-size: 12px;
+  color: var(--overlay-text-muted);
+  width: 56px;
+}
+
+.settingsSelect {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--overlay-button-border);
+  background: var(--overlay-button-bg);
+  color: var(--overlay-text);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.settingsHint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--overlay-text-muted);
+}
+
+.settingsHint code {
+  color: var(--overlay-text);
+}
   border: 1px solid var(--overlay-button-border);
   background: var(--overlay-button-bg);
   color: var(--overlay-text);

@@ -13,6 +13,12 @@ export type OverlayAPI = {
     powerSource: 'ac' | 'battery' | 'unknown'
   } | null>
   getSettingsJson: () => Promise<string | null>
+  getSystemUsage: () => Promise<{
+    cpuPercent: number | null
+    memoryPercent: number | null
+    gpuPercent: number | null
+    updatedAt: number
+  }>
   onOpenSettings: (handler: () => void) => () => void
 }
 
@@ -31,6 +37,7 @@ const api: OverlayAPI = {
   getBatteryPercentage: () => ipcRenderer.invoke('overlay:get-battery-percentage'),
   getBatteryInfo: () => ipcRenderer.invoke('overlay:get-battery-info'),
   getSettingsJson: () => ipcRenderer.invoke('overlay:get-settings-json'),
+  getSystemUsage: () => ipcRenderer.invoke('overlay:get-system-usage'),
   onOpenSettings: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('overlay:open-settings', listener)

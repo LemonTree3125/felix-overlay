@@ -22,6 +22,50 @@ npm run dev
 - Preload IPC bridge: [electron/preload.ts](electron/preload.ts)
 - Hover detection + widget grid: [src/renderer/App.tsx](src/renderer/App.tsx)
 
+## Settings
+
+The overlay reads a JSON config at startup.
+
+### Where settings live
+
+- **Dev**: uses [public/settings.json](public/settings.json) (so edits apply immediately).
+- **Production build**: uses a writable file at `app.getPath('userData')/settings.json`.
+	- If missing, the app creates it with defaults.
+
+### Schema
+
+```jsonc
+{
+	"forceFallback": false,
+	"theme": {
+		"backgroundColor": "#eeeeee",
+		"backgroundOpacity": 0.28,
+		"textColor": "#111111",
+		"textOpacity": 0.96
+	},
+	"widgets": {
+		"big": "clock",
+		"small": ["cpu", "gpu", "memory"]
+	}
+}
+```
+
+### Options
+
+- `forceFallback`: boolean
+	- If `true`, the app ignores the file and uses defaults.
+- `theme.backgroundColor` / `theme.textColor`: string
+	- Hex colors: `#RGB` or `#RRGGBB`.
+- `theme.backgroundOpacity` / `theme.textOpacity`: number
+	- Clamped to the range `[0, 1]`.
+- `widgets.big`: one of:
+	- `clock`, `empty`
+- `widgets.small`: an array of **exactly 3** small widget types:
+	- `weather`, `battery`, `cpu`, `gpu`, `memory`, `empty`
+	- Note: `usage` (combined CPU/GPU/Mem) is still accepted for backward compatibility, but not shown in the Settings dropdown.
+
+Unknown/invalid values are replaced with safe defaults.
+
 ## Click-through logic (critical)
 
 The core pattern is:

@@ -15,6 +15,12 @@ declare global {
         powerSource: 'ac' | 'battery' | 'unknown'
       } | null>
       getSettingsJson: () => Promise<string | null>
+      getSystemUsage: () => Promise<{
+        cpuPercent: number | null
+        memoryPercent: number | null
+        gpuPercent: number | null
+        updatedAt: number
+      }>
       onOpenSettings: (handler: () => void) => () => void
     }
   }
